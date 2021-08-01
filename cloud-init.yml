@@ -1,0 +1,131 @@
+#cloud-config
+
+## FAQ ##
+# Q: How do I use this file?
+# A: 1. Install multipass (https://multipass.run/).
+#    2. In this file, go to section "0 | DEFINE VARIABLES" and set all the variables.
+#    2. Replace the key in "ssh-authorized-keys" section with your own public ssh key
+#    3. Uncomment the moodle plugins in section 3 you want to install
+#    3. Open a cmd/powershell/... and run:
+#       - multipass launch -vvv -n moodle --cloud-init <path to this cloud-init.yml file>
+#    4. When the text "Waiting for initialization to complete..." appears,
+#       just press Ctrl+C to get back to being able to run commands again.
+#    5. Run the command:
+#       - multipass shell moodle
+#    6. By this time, the vm is still getting set up - it's downloading all the
+#       packages and moodle files. You can execute the "htop" command
+#       to get an overview of processes and cpu/memory usage. When you notice
+#       the cpu usage drops to near 0%, you know it's finished and ready to use.
+#
+# Q: I see there are other cloud-init files too. What are they for?
+# A: This configuration comes WITHOUT SSL/HTTPS. If you either don't own
+#    a domain name, or you're host this vm on your local machine, you
+#    won't be able to set up moodle with HTTPS. That means you HAVE
+#    to use this file when you run "multipass launch ... --cloud-init <file>".
+#    cloud-init-dns-challenge is for setting up SSL on your moodle
+#    site using a DNS challenge, while HTTP is for HTTP challenge.
+#    https://letsencrypt.org/docs/challenge-types/
+#
+# Q: I'd like to add something to this cloud-init script. What should I watch out for?
+# A: 1. Do not leave empty list items "- " anywhere. Example:
+#    runcmd:
+#      - echo "$SHELL" 
+#      - 
+#      ^ BAD! Empty list item => The script won't run at all.
+#
+#    2. When the script starts, the current working directory is /
+
+## TROUBLESHOOTING ##
+# Problem:  After running multipass launch, it's stuck on
+#           "Waiting for initialization to complete..."
+# Solution: Just ignore this and press Ctrl+C to get back to being able
+#           to write commands again. See point 4 in "Q: How do I use this file?"
+#
+# Problem:  After running multipass launch, it's stuck on "Starting moodle..."
+# Solution: Run these commands:
+#             - multipass delete moodle
+#             - multipass purge
+#             - multipass launch <same parameters as last time>
+#
+# Problem:  Executing multipass commands are generally slow/doesn't work
+# Solution: Restart your PC, it's proven to help.
+#
+# Problem:  Script doesn't seem to run at all.
+# Solution: See "Q: I'd like to add something [...]"
+
+cloud_config_modules:
+  - runcmd
+
+cloud_final_modules:
+  - scripts-user
+
+users:
+  - name: moodle
+    groups: sudo
+    shell: /bin/bash
+    sudo: ['ALL=(ALL) NOPASSWD:ALL']
+    ssh-authorized-keys:
+      # [!] REPLACE WITH YOUR PUBLIC SSH KEY
+      - ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIHUfvEU4d+Pja79qF9M+k+i230/QhiHih/1d/fn8T76t YourName
+      # How to generate SSH key on windows 10 and connect to your vm using vs code:
+      # https://simenwiik.medium.com/passwordless-ssh-between-windows-10-and-ubuntu-server-feat-vs-code-b84f65281376
+runcmd:
+  ## 0 | DEFINE VARIABLES ##
+  -            MDL_EMAIL=
+  -           MDL_DBPASS=
+  -        MDL_ADMINPASS=
+  - MDL_POSTGRES_VERSION=12 # Check version installed: ls /etc/postgresql/
+  -           IP_GATEWAY=$(ip route | grep -Po "\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}(?= dev)" | head -1)
+  -              IP_ADDR=172.20.0.1
+  - echo "ip is $IP_GATEWAY" > ipgate
+  - echo "pwd - $(pwd)" > /home/ubuntu/workingdir
+  - sudo echo "sudo pwd - $(sudo pwd)" >> /home/ubuntu/workingdir
+
+  ## 1 | INSTALL DEPENDENCIES ##
+  - [ sudo, add-apt-repository, ppa:ondrej/php ]
+  - [ sudo, add-apt-repository, ppa:ondrej/apache2 ]
+  - sudo apt update
+  - sudo apt install -y apache2 php php-pear phppgadmin php-curl php-zip php-gd php-intl php-soap php-xmlrpc php-mbstring maxima postgresql
+
+  ## 2 | CONFIGURE DATABASE ##
+  - sudo -u postgres psql -c "CREATE USER moodleuser WITH PASSWORD '$(echo $MDL_DBPASS)'";
+  - sudo -u postgres psql -c "CREATE DATABASE moodle WITH OWNER moodleuser";
+  - sudo sh -c "echo 'host all all 0.0.0.0/0 trust' >> /etc/postgresql/$MDL_POSTGRES_VERSION/main/pg_hba.conf"
+
+  ## 3 | DOWNLOAD MOODLE AND OPTIONAL MODS/QTYPES/... ##
+  - sudo mkdir /var/moodledata
+  - sudo chown www-data /var/moodledata
+  - git clone --recursive https://github.com/moodle/moodle.git /var/www/moodle
+  # [!] OPTIONAL: Uncomment to install ShortMath
+  # - git clone https://github.com/KQMATH/moodle-qtype_shortmath.git /var/www/moodle/question/type/shortmath
+  # [!] OPTIONAL: Uncomment to install CapQuiz
+  # - git clone https://github.com/KQMATH/moodle-mod_capquiz.git /var/www/moodle/
+  # [!] OPTIONAL: Uncomment to install Stack
+  # - git clone https://github.com/KQMATH/moodle-qtype_stack.git /var/www/moodle/question/type/stack
+
+  ## 4 | SET STATIC IP ##
+  - sudo echo "" > /etc/cloud/cloud.cfg.d/99-disable-network-config.cfg
+  - sudo netplan set 
+
+  ## 5 | UPDATE MOODLE CONFIGURATION FILES ##
+  # 4.1 config.php
+  - cp /var/www/moodle/config-dist.php /var/www/moodle/config.php
+  # Original lines: $CFG->dbname    = 'moodle';
+  #                 $CFG->dbuser    = 'username';
+  #                 $CFG->dbpass    = 'password';
+  #                 $CFG->wwwroot   = 'http://example.com/moodle';
+  #                 $CFG->dataroot  = '/home/example/moodledata';
+  - sed -i -e s/'username/'moodleuser/ -e "s/'password/'$MDL_DBPASS/" -e "s@example.com/moodle@$IPADDR@" -e s@'home/example/moodledata@'var/moodledata@ /var/www/moodle/config.php
+  # Original lines: // $CFG->debug = (E_ALL | E_STRICT);
+  #                 // $CFG->debugdisplay = 1;
+  #                 // $CFG->cachejs = false
+  #                 // $CFG->cachetemplates = false;
+  - sed -i -e 's@// $CFG->debug @$CFG->debug @' -e 's@// $CFG->debugdisplay @$CFG->debugdisplay @' -e 's@// $CFG->cachejs @$CFG->cachejs @' -e 's@// $CFG->cachetemplates @$CFG->cachetemplates @' /var/www/moodle/config.php
+  - sudo chown -R www-data /var/www/
+  # 4.2 php8.0/cli/php.ini
+  # Original lines: ;max_input_vars = 1000
+  - sudo sed -i 's/;max_input_vars = 1000/max_input_vars = 10000/' /etc/php/8.0/cli/php.ini
+  # 4.2 sites-available/000-default.conf
+  - sudo sed -i -e "s/webmaster@localhost/$MDL_EMAIL/" -e "s@/var/www/html@/var/www/moodle@" /etc/apache2/sites-available/000-default.conf
+  - sudo systemctl restart apache2
+  - sudo -u www-data php /var/www/moodle/admin/cli/install_database.php --agree-license --adminemail=simenwii@stud.ntnu.no --fullname="KQMATH Moodle Server" --shortname="KQMATH" --summary="Server for the KQMATH (Classroom Quiz) moodle plugin" --adminpass=$(echo $MDL_ADMINPASS)
