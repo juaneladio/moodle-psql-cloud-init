@@ -144,4 +144,4 @@ runcmd:
   # 5.3 apache2/sites-available/000-default.conf
   - sudo sed -i -e "s/webmaster@localhost/$MDL_EMAIL/" -e "s@/var/www/html@/var/www/moodle@" /etc/apache2/sites-available/000-default.conf
   - sudo systemctl restart apache2
-  - sudo -u www-data php /var/www/moodle/admin/cli/install_database.php --agree-license --adminemail=simenwii@stud.ntnu.no --fullname="KQMATH Moodle Server" --shortname="KQMATH" --summary="Server for the KQMATH (Classroom Quiz) moodle plugin" --adminpass=$(echo $MDL_ADMINPASS)
+  - sudo -u www-data php /var/www/moodle/admin/cli/install_database.php --agree-license --adminemail=$(echo $MDL_EMAIL) --fullname="KQMATH Moodle Server" --shortname="KQMATH" --summary="Server for the KQMATH (Classroom Quiz) moodle plugin" --adminpass=$(echo $MDL_ADMINPASS)
