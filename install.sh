@@ -2,16 +2,16 @@ while getopts ":v:d:a:e:g:i:m:p:cqst" opt; do
   case $opt in
     v ) # Moodle version, optional. Default is master
       MDL_VERSION=$OPTARG;;
-    d ) # Database password, required
-      MDL_DBPASS=$OPTARG;;
     a ) # Admin password, required
       MDL_ADMINPASS=$OPTARG;;
+    d ) # Database password, required
+      MDL_DBPASS=$OPTARG;;
     e ) # Email, required
       MDL_EMAIL=$OPTARG;;
-    g ) # Gateway IP, required
-      IP_GATEWAY=$OPTARG;;
     i ) # IP address, required
       IP_ADDR=$OPTARG;;
+    g ) # Gateway IP, required
+      IP_GATEWAY=$OPTARG;;
     m ) # IP mask, optional. Default is 24
       IP_MASK=OPTARG;;
     p ) # Postgres version, optional. Default is 12
