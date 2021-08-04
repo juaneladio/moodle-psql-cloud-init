@@ -2,17 +2,16 @@
 
 ## FAQ ##
 # Q: How do I use this file?
-# A: Documentation is at: https://www.ntnu.no/wiki/display/iemoodle/%5BLOCAL+VM%5D+Automatic+moodle+setup+with+Multipass+and+cloud-init
-#    1. Install multipass (https://multipass.run/).
+# A: 1. Install multipass (https://multipass.run/).
 #    2. Replace the key in "ssh-authorized-keys" section with your own public ssh key
-#    3. Add flags to the `sudo bash /home/ubuntu/script` line. Flag documentation is right above
+#    3. Uncomment the moodle plugins in section 3 you want to install
 #    3. Open a cmd/powershell/... and run:
 #       - multipass launch -vvv -n moodle --cloud-init <path to this cloud-init.yml file>
 #    4. When the text "Waiting for initialization to complete..." appears,
 #       just press Ctrl+C to get back to being able to run commands again.
 #    5. Run the command:
 #       - multipass shell moodle
-#    6. By now, the vm is still getting set up - it's downloading all the
+#    6. By this time, the vm is still getting set up - it's downloading all the
 #       packages and moodle files. You can execute the "htop" command
 #       to get an overview of processes and cpu/memory usage. When you notice
 #       the cpu usage drops to near 0%, you know it's finished and ready to use.
@@ -23,17 +22,8 @@
 #    won't be able to set up moodle with HTTPS. That means you HAVE
 #    to use this file when you run "multipass launch ... --cloud-init <file>".
 #    cloud-init-dns-challenge is for setting up SSL on your moodle
-#    site using a DNS challenge, while HTTP is for HTTP challenge.
+#    site using a DNS challenge, while http is for http challenge.
 #    https://letsencrypt.org/docs/challenge-types/
-#
-# Q: I'd like to add something to this cloud-init script. What should I watch out for?
-# A: 1. Do not leave empty list items "- " anywhere. Example:
-#    runcmd:
-#      - echo "$SHELL" 
-#      - 
-#      ^ BAD! Empty list item => The script won't run at all.
-#
-#    2. When the script starts, the current working directory is /
 
 ## TROUBLESHOOTING ##
 # Problem:  After running multipass launch, it's stuck on
@@ -49,9 +39,6 @@
 #
 # Problem:  Executing multipass commands are generally slow/doesn't work
 # Solution: Restart your PC, it's proven to help.
-#
-# Problem:  Script doesn't seem to run at all.
-# Solution: See "Q: I'd like to add something [...]"
 
 cloud_config_modules:
   - runcmd
@@ -65,53 +52,36 @@ users:
     shell: /bin/bash
     sudo: ['ALL=(ALL) NOPASSWD:ALL']
     ssh-authorized-keys:
-      # [!] REPLACE WITH YOUR PUBLIC SSH KEY
-      - ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIHUfvEU4d+Pja79qF9M+k+i230/QhiHih/1d/fn8T76t YourName
+      - ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIHUfvEU4d+Pj793B9MZk+iqP0/nV6FJgN/fv/Ax1gDb1 SimenMoodle
+      # ^ REPLACE WITH YOUR PUBLIC SSH KEY
       # How to generate SSH key on windows 10 and connect to your vm using vs code:
       # https://simenwiik.medium.com/passwordless-ssh-between-windows-10-and-ubuntu-server-feat-vs-code-b84f65281376
 runcmd:
+  ## 1 | INSTALL DEPENDENCIES ##
+  - "sudo add-apt-repository ppa:ondrej/php"
+  - "sudo add-apt-repository ppa:ondrej/apache2"
   - sudo apt update
-  - sudo apt install dos2unix
-  - wget https://raw.githubusercontent.com/KQMATH/cloud-init-scripts/main/install.sh -O /home/ubuntu/script
-  - dos2unix /home/ubuntu/script
+  - sudo apt install -y apache2 php8.0 php-pear phppgadmin php-curl php-zip php-gd php-intl php-soap php-xmlrpc php-mbstring maxima postgresql
+  
+  ## 2 | CERTBOT
+  - sudo snap install --classic certbot
+  - sudo ln -s /snap/bin/certbot /usr/bin/certbot
+  - sudo snap set certbot trust-plugin-with-root=ok
 
-  ## RUN SCRIPT ##
-  # Flags enclosed in [] are optional.
-  #
-  # [-v <version>]
-  #   Version of moodle to install. Not case sensitive.
-  #   If omitted, default value "master" is used
-  #   Possible values: master | MOODLE_311_STABLE | MOODLE_39_STABLE
-  #
-  # -a <adminpass>
-  #    Moodle web admin password
-  #
-  # -d <dbpass>
-  #    Moodle database password
-  #
-  # -e <email>
-  #   Email address to associate with the apache web server installation
-  #
-  # -i <ip>
-  #   IP address for the server
-  #
-  # -g <gateway>
-  #   Gateway IP address
-  #
-  # [-m <mask>]
-  #   Subnet mask. Must match gateway settings.
-  #   If omitted, default value 24 is used
-  #   
-  # [-c]
-  #   Should install CapQuiz
-  #
-  # [-q]
-  #   Should install QTracker
-  #
-  # [-s]
-  #   Should install Stack
-  #
-  # [-t]
-  #   Should install ShortMath
-  #
-  - sudo bash /home/ubuntu/script [-v MOODLEVERSION] [-cqst] -e EMAIL -a ADMINPASS -d DBPASS -i IPADDRESS -g GATEWAYIP 
+  ## 3 | CONFIGURE DATABASE ##
+  - sudo -u postgres psql -c "CREATE USER moodleuser WITH PASSWORD 'KlasseromsQuiz'";
+  - sudo -u postgres psql -c "CREATE DATABASE moodle WITH OWNER moodleuser";
+  - sudo sh -c 'echo "host all all 0.0.0.0/0 trust" >> /etc/postgresql/12/main/pg_hba.conf'
+
+  ## 4 | DOWNLOAD MOODLE AND OPTIONAL MODS/QTYPES/... ##
+  - git clone --recursive https://github.com/moodle/moodle.git /var/www/moodle
+  # OPTIONAL: Uncomment to install ShortMath
+  # - git clone https://github.com/KQMATH/moodle-qtype_shortmath.git /var/www/moodle/question/type/shortmath
+  # OPTIONAL: Uncomment to install CapQuiz
+  # - git clone https://github.com/KQMATH/moodle-mod_capquiz.git /var/www/moodle/
+  # OPTIONAL: Uncomment to install Stack
+  - git clone https://github.com/KQMATH/moodle-qtype_stack.git /var/www/moodle/question/type/stack
+  - sudo chown -R moodle /var/www/
+
+  ## 5 | UPDATE CONFIGURATION FILES ##
+  - 
