@@ -44,12 +44,21 @@ sudo netplan apply
 sudo add-apt-repository ppa:ondrej/php
 sudo add-apt-repository ppa:ondrej/apache2
 sudo apt update
-sudo apt install -y apache2 postgresql maxima php phppgadmin php-pear php-curl php-zip php-gd php-intl php-soap php-yaml php-xmlrpc php-mbstring
+sudo apt install -y apache2 postgresql php phppgadmin php-pear php-curl php-zip php-gd php-intl php-soap php-yaml php-xmlrpc php-mbstring
 
-## 3 | CONFIGURE DATABASE ##
+## 3 | CONFIGURE INSTALLED DEPENDENCIES ##
+# 3.1 Postgres
 sudo -u postgres psql -c "CREATE USER moodleuser WITH PASSWORD '$MDL_DBPASS'";
 sudo -u postgres psql -c "CREATE DATABASE moodle WITH OWNER moodleuser";
 sudo bash -c "echo 'host all all 0.0.0.0/0 trust' >> /etc/postgresql/${MDL_POSTGRES_VERSION-12}/main/pg_hba.conf"
+
+# 3.2 Apache & PHP
+# Moodle requires at least 5000 input vars
+sudo sed -i 's/;max_input_vars = 1000/max_input_vars = 10000/' /etc/php/8.0/cli/php.ini
+sudo sed -i 's/;max_input_vars = 1000/max_input_vars = 10000/' /etc/php/8.0/apache2/php.ini
+# Change DocumentRoot and ServerAdmin
+sudo sed -i -e "s/webmaster@localhost/$MDL_EMAIL/" -e "s@/var/www/html@/var/www/moodle@" /etc/apache2/sites-available/000-default.conf
+sudo systemctl restart apache2
 
 ## 4 | DOWNLOAD MOODLE AND OPTIONAL MODS/QTYPES/... ##
 # 4.1 Make data directory
@@ -59,28 +68,7 @@ sudo chown www-data /var/moodledata
 # 4.2 Clone moodle
 git clone --recursive --branch ${MDL_VERSION-master} https://github.com/moodle/moodle.git /var/www/moodle
 
-# 4.3 Download optional dependencies
-if [[ -n $CAPQUIZ ]]; then
-  git clone https://github.com/KQMATH/moodle-mod_capquiz.git /var/www/moodle/
-fi
-
-if [[ -n $STACK ]]; then
-  wget https://moodle.org/plugins/download.php/23028/qbehaviour_adaptivemultipart_moodle39_2020103000.zip -O ~/temp.zip && sudo unzip -d /var/www/moodle/question/behaviour/ ~/temp.zip; rm ~/temp.zip
-  wget https://moodle.org/plugins/download.php/17558/qbehaviour_dfexplicitvaildate_moodle39_2018080600.zip -O ~/temp.zip && sudo unzip -d /var/www/moodle/question/behaviour/ ~/temp.zip; rm ~/temp.zip
-  wget https://moodle.org/plugins/download.php/17559/qbehaviour_dfcbmexplicitvaildate_moodle39_2018080600.zip -O ~/temp.zip && sudo unzip -d /var/www/moodle/question/behaviour/ ~/temp.zip; rm ~/temp.zip
-  git clone https://github.com/KQMATH/moodle-qtype_stack.git /var/www/moodle/question/type/stack
-fi
-
-if [[ -n $QTRACKER ]]; then
-  git clone https://github.com/KQMATH/moodle-local_qtracker.git /var/www/moodle/local/qtracker
-fi
-
-if [[ -n $SHORTMATH ]]; then
-  git clone https://github.com/KQMATH/moodle-qtype_shortmath.git /var/www/moodle/question/type/shortmath
-fi
-
-## 5 | UPDATE CONFIGURATION FILES ##
-# 5.1 moodle/config.php
+# 4.3 Configure moodle
 cp /var/www/moodle/config-dist.php /var/www/moodle/config.php
 # Original lines: $CFG->dbname    = 'moodle';
 #                 $CFG->dbuser    = 'username';
@@ -93,14 +81,42 @@ sed -i -e s/'username/'moodleuser/ -e "s/'password/'$MDL_DBPASS/" -e "s@example.
 #                 // $CFG->cachejs = false
 #                 // $CFG->cachetemplates = false;
 sed -i -e 's@// $CFG->debug @$CFG->debug @' -e 's@// $CFG->debugdisplay @$CFG->debugdisplay @' -e 's@// $CFG->cachejs @$CFG->cachejs @' -e 's@// $CFG->cachetemplates @$CFG->cachetemplates @' /var/www/moodle/config.php
-sudo chown -R www-data /var/www/
+sudo chown -R root:www-data /var/www/
 
-# 5.2 php8.0/cli/php.ini, php8.0/apache2/php.ini
-# Original lines: ;max_input_vars = 1000
-sudo sed -i 's/;max_input_vars = 1000/max_input_vars = 10000/' /etc/php/8.0/cli/php.ini
-sudo sed -i 's/;max_input_vars = 1000/max_input_vars = 10000/' /etc/php/8.0/apache2/php.ini
+# 4.4 Download optional Moodle plugins
+if [[ -n $CAPQUIZ ]]; then
+  git clone https://github.com/KQMATH/moodle-mod_capquiz.git /var/www/moodle/
+fi
 
-# 5.3 apache2/sites-available/000-default.conf
-sudo sed -i -e "s/webmaster@localhost/$MDL_EMAIL/" -e "s@/var/www/html@/var/www/moodle@" /etc/apache2/sites-available/000-default.conf
-sudo systemctl restart apache2
+if [[ -n $STACK ]]; then
+  # THIS MIGHT SUDDENLY BREAK IN THE FUTURE
+  # Download tools to build Maxima from source
+  sudo apt install -y build-essential texinfo sbcl
+
+  # Download and install Maxima from source
+  wget http://kent.dl.sourceforge.net/project/maxima/Maxima-source/5.44.0-source/maxima-5.44.0.tar.gz -O /home/ubuntu/maxima.tar.gz
+  tar -xf /home/ubuntu/maxima.tar.gz && rm -r /home/ubuntu/maxima.tar.gz
+  /home/ubuntu/maxima-5.44.0/configure --with-sbcl
+  (cd /home/ubuntu/maxima-5.44.0/ && make && sudo make install)
+  rm -r /home/ubuntu/maxima-5.44.0
+
+  # Download and install question behaviours
+  wget https://moodle.org/plugins/download.php/23028/qbehaviour_adaptivemultipart_moodle39_2020103000.zip -O ~/temp.zip && sudo unzip -d /var/www/moodle/question/behaviour/ ~/temp.zip; rm ~/temp.zip
+  wget https://moodle.org/plugins/download.php/17558/qbehaviour_dfexplicitvaildate_moodle39_2018080600.zip -O ~/temp.zip && sudo unzip -d /var/www/moodle/question/behaviour/ ~/temp.zip; rm ~/temp.zip
+  wget https://moodle.org/plugins/download.php/17559/qbehaviour_dfcbmexplicitvaildate_moodle39_2018080600.zip -O ~/temp.zip && sudo unzip -d /var/www/moodle/question/behaviour/ ~/temp.zip; rm ~/temp.zip
+
+  # Download stack
+  git clone https://github.com/KQMATH/moodle-qtype_stack.git /var/www/moodle/question/type/stack
+fi
+
+if [[ -n $QTRACKER ]]; then
+  git clone https://github.com/KQMATH/moodle-local_qtracker.git /var/www/moodle/local/qtracker
+fi
+
+if [[ -n $SHORTMATH ]]; then
+  git clone https://github.com/KQMATH/moodle-qtype_shortmath.git /var/www/moodle/question/type/shortmath
+fi
+
+## 5 | RUN INSTALL_DATABASE.PHP ##
+
 sudo -u www-data php /var/www/moodle/admin/cli/install_database.php --agree-license --adminemail=$MDL_EMAIL --fullname="KQMATH Moodle Server" --shortname="KQMATH" --summary="Server for the KQMATH (Classroom Quiz) moodle plugin" --adminpass=$MDL_ADMINPASS
