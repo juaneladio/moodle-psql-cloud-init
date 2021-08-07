@@ -3,11 +3,13 @@ For automatically setting up a moodle virtual machine running ubuntu using multi
 
 [Documentation]()
 
-## Status on scripts
+## Status on plugin compatibility
 |       | cloud-init | cloud-init-dns-challenge | cloud-init-http-challenge |
 |------:|:----------:|:------------------------:|:-------------------------:|
-| works |      ✅     |             ❌            |             ❌             |
-
+| Stack |      ✅     |             ❌            |             ❌             |
+| CapQuiz |      ❔     |             ❌            |             ❌             |
+| ShortMath |      ❔     |             ❌            |             ❌             |
+| QTracker |      ❔     |             ❌            |             ❌             |
 ## After installing stack
 For stack to work properly, you need to manually set the Maxima version.
 

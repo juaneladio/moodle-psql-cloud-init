@@ -41,8 +41,8 @@ sudo bash -c "echo '        addresses: [$IP_GATEWAY, 1.1.1.1, 1.0.0.1]' >> /etc/
 sudo netplan apply
 
 ## 2 | INSTALL DEPENDENCIES ##
-sudo add-apt-repository -y ppa:ondrej/php
-sudo add-apt-repository -y ppa:ondrej/apache2
+sudo add-apt-repository ppa:ondrej/php
+sudo add-apt-repository ppa:ondrej/apache2
 sudo apt update
 sudo apt install -y apache2 postgresql php phppgadmin php-pear php-curl php-zip php-gd php-intl php-soap php-yaml php-xmlrpc php-mbstring
 
@@ -96,7 +96,7 @@ if [[ -n $STACK ]]; then
   # Download and install Maxima from source
   wget http://kent.dl.sourceforge.net/project/maxima/Maxima-source/5.44.0-source/maxima-5.44.0.tar.gz -O ~/maxima.tar.gz && sudo tar -xf ~/maxima.tar.gz -C ~/; rm ~/maxima.tar.gz
   (cd ~/maxima-5.44.0/ && sudo bash -c "./configure --with-sbcl && make && make install")
-  rm -rf /home/ubuntu/maxima-5.44.0
+  rm -rf ~/maxima-5.44.0
 
   # Download and install question behaviours
   wget https://moodle.org/plugins/download.php/23028/qbehaviour_adaptivemultipart_moodle39_2020103000.zip -O ~/temp.zip && sudo unzip -d /var/www/moodle/question/behaviour/ ~/temp.zip; rm ~/temp.zip
