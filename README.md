@@ -1,7 +1,7 @@
 # cloud-init-scripts
 For automatically setting up a moodle virtual machine running ubuntu using multipass and cloud-init.
 
-[Documentation]()
+[Documentation](https://www.ntnu.no/wiki/display/iemoodle/%5BLOCAL+VM%5D+Automatic+moodle+setup+with+Multipass+and+cloud-init)
 
 ## Status on plugin compatibility
 |       | cloud-init | cloud-init-dns-challenge | cloud-init-http-challenge |
