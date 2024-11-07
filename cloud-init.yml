@@ -68,7 +68,7 @@ users:
       # [!] REPLACE WITH YOUR PUBLIC SSH KEY
       - ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIHUfvEU4d+Pja79qF9M+k+i230/QhiHih/1d/fn8T76t YourName
       # How to generate SSH key on windows 10 and connect to your vm using vs code:
-      # https://simenwiik.medium.com/passwordless-ssh-between-windows-10-and-ubuntu-server-feat-vs-code-b84f65281376
+      # https://medium.com/@ramon.solodezaldivar/how-to-establish-a-passwordless-ssh-s-connection-between-windows-and-linux-c75a948513b2
 runcmd:
   - sudo apt update
   - sudo apt install dos2unix
