@@ -44,7 +44,8 @@ sudo netplan apply
 sudo add-apt-repository ppa:ondrej/php
 sudo add-apt-repository ppa:ondrej/apache2
 sudo apt update
-sudo apt install -y apache2 postgresql php phppgadmin php-pear php-curl php-zip php-gd php-intl php-soap php-yaml php-xmlrpc php-mbstring
+# sudo apt install -y apache2 postgresql php phppgadmin php-pear php-curl php-zip php-gd php-intl php-soap php-yaml php-xmlrpc php-mbstring
+sudo apt install -y apache2 postgresql php8.0 phppgadmin php8.0-pgsql php8.0-xml php8.0-curl php8.0-zip php8.0-gd php8.0-intl php8.0-soap php8.0-yaml php8.0-xmlrpc php8.0-mbstring
 
 ## 3 | CONFIGURE INSTALLED DEPENDENCIES ##
 # 3.1 Postgres
@@ -66,6 +67,7 @@ sudo mkdir /var/moodledata
 sudo chown www-data /var/moodledata
 
 # 4.2 Clone moodle
+git config --global core.compression 9 repack
 git clone --recursive --branch ${MDL_VERSION-master} https://github.com/moodle/moodle.git /var/www/moodle
 
 # 4.3 Configure moodle
