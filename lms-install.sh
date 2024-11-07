@@ -67,7 +67,6 @@ sudo mkdir /var/moodledata
 sudo chown www-data /var/moodledata
 
 # 4.2 Clone moodle
-git config --global core.compression 9 repack
 git clone --recursive --branch ${MDL_VERSION-master} https://github.com/moodle/moodle.git /var/www/moodle
 
 # 4.3 Configure moodle
